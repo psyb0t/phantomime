@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+/usr/bin/env pip install selenium --upgrade
+/usr/bin/env docker pull selenium/standalone-chrome
+/usr/bin/env docker pull selenium/standalone-firefox
