@@ -1,5 +1,4 @@
 import os
-import sys
 import base64
 import atexit
 
@@ -28,10 +27,6 @@ Value:
 Two integer value tuple (width, height)
 """
 
-# The default Selenium driver to use
-driver = 'firefox'
-
-
 ppy_jQuery = '__ppy__jQuery'
 """The jQuery function name to use when injecting
 
@@ -39,10 +34,9 @@ Value:
 Unique function name string
 """
 
+driver = 'firefox'
 abs_path = os.path.dirname(os.path.realpath(__file__))
 jQuery_file = '%s/jquery.js' % abs_path
-container_name = None
-port = None
 Browser = None
 
 def set_driver(d):
@@ -56,24 +50,31 @@ def set_driver(d):
   d = d.lower()
   supported_drivers = ['firefox', 'chrome']
   if d not in supported_drivers:
-    print 'Invalid driver. Supported: %s' % ', '.join(supported_drivers)
-    sys.exit()
+    raise Exception(
+      'Invalid driver. Supported: %s' % ', '.join(supported_drivers)
+    )
   
   driver = d
+  
+  return True
 
-def start_docker_machine():
+def start_docker_machine(container_name, port):
   if verbose:
     print 'Starting docker machine %s...' % container_name
   
-  Popen(
-    ('/usr/bin/env docker run --rm --name="%s" -p 127.0.0.1:%s:4444 '
-    'selenium/standalone-%s >> /dev/null') % (container_name, port, driver),
-    shell=True
-  )
-  
-  return
+  try:
+    Popen(
+      ('/usr/bin/env docker run --rm --name="%s" -p 127.0.0.1:%s:4444 '
+      'selenium/standalone-%s >> /dev/null') % (
+        container_name, str(port), driver
+      ), shell=True
+    )
+    
+    return True
+  except:
+    return False
 
-def docker_machine_running(t=30, c=1):
+def docker_machine_running(container_name, t=30, c=1):
   if c >= t:
     return False
   
@@ -89,29 +90,25 @@ def docker_machine_running(t=30, c=1):
   if not container_name in docker_ps_a:
     sleep(1)
     c += 1
-    return docker_machine_running(t, c)
+    return docker_machine_running(container_name, t, c)
   
   return True
 
-def stop_docker_machine():
-  try:
-    from subprocess import check_output
-  except:
-    pass
-  
+def stop_docker_machine(container_name):
   if verbose:
     print 'Stopping docker machine %s...' % container_name
   
   try:
     check_output(
-      '/usr/bin/env docker stop %s' % container_name, shell=True
+      '/usr/bin/env docker stop %s' % container_name,
+      shell=True, stderr=open(os.devnull, 'w')
     )
+    
+    return True
   except:
-    pass
-  
-  return
+    return False
 
-def connect_to_selenium(t=30, c=1):
+def connect_to_selenium(port, t=30, c=1):
   global Browser
   
   if c >= t:
@@ -120,35 +117,25 @@ def connect_to_selenium(t=30, c=1):
   try:
     if verbose:
       print ('Connecting to docker selenium server '
-      'http://127.0.0.1:%s/wd/hub [%s/%s]...') % (port, str(c), str(t))
+      'http://127.0.0.1:%s/wd/hub [%s/%s]...') % (str(port), str(c), str(t))
+    
+    if driver == 'chrome':
+      desired_caps = DesiredCapabilities.CHROME
+    elif driver == 'firefox':
+      desired_caps = DesiredCapabilities.FIREFOX
     
     Browser = webdriver.Remote(
-      command_executor='http://127.0.0.1:%s/wd/hub' % port,
-      desired_capabilities=DesiredCapabilities.FIREFOX
+      command_executor='http://127.0.0.1:%s/wd/hub' % str(port),
+      desired_capabilities=desired_caps
     )
   except:
     c += 1
     sleep(1)
-    connect_to_selenium(t, c)
+    connect_to_selenium(port, t, c)
   
   return True
 
-def init():
-  """Initiate the browser by finding
-  an unused port for the Selenium server and
-  an unused container name, then starting the
-  Selenium server docker machine and connecting
-  to it
-  """
-  global container_name, port
-  
-  netstat = check_output(
-    '/usr/bin/env netstat -lpn', shell=True
-  )
-  port = str(choice(range(5000, 10000)))
-  while ':%s' % port in netstat:
-    port = choice(range(5000, 10000))
-
+def new_container_name():
   docker_ps_a = check_output(
     '/usr/bin/env docker ps -a', shell=True
   )
@@ -158,20 +145,43 @@ def init():
   while container_name in docker_ps_a:
     container_name = choice(range(100000, 500000))
   
-  atexit.register(stop_docker_machine)
-  start_docker_machine()
+  return container_name
 
-  if not docker_machine_running():
-    print 'Failed to start Selenium docker machine'
-    sys.exit()
+def new_local_port():
+  netstat = check_output(
+    '/usr/bin/env netstat -lpn', shell=True
+  )
+  port = str(choice(range(5000, 10000)))
+  while ':%s' % port in netstat:
+    port = str(choice(range(5000, 10000)))
+  
+  return int(port)
 
-  if not connect_to_selenium():
-    print 'Could not connect to Selenium server'
-    sys.exit()
+def init():
+  """Initiate the browser by finding
+  an unused port for the Selenium server and
+  an unused container name, then starting the
+  Selenium server docker machine and connecting
+  to it
+  
+  Returns:
+  Two value tuple (container_name, container_port)
+  """
+  container_port = new_local_port()
+  container_name = new_container_name()
+  
+  atexit.register(stop_docker_machine, container_name)
+  start_docker_machine(container_name, container_port)
+
+  if not docker_machine_running(container_name):
+    raise Exception('Failed to start Selenium docker machine')
+
+  if not connect_to_selenium(container_port):
+    raise Exception('Could not connect to Selenium server')
   
   Browser.set_window_size(window_size[0], window_size[1])
   
-  return
+  return (container_name, container_port)
 
 def load_page(url):
   """Loads a URL in the browser window
@@ -242,9 +252,7 @@ def scroll_page():
   if verbose:
     print 'Scrolling page...'
   
-  runjs('window.scrollTo(0, document.body.scrollHeight);')
-  
-  return
+  return runjs('window.scrollTo(0, document.body.scrollHeight);')
 
 def page_contains_text(text):
   """Check if the page contains the specified text string
@@ -497,7 +505,7 @@ def select_option(select_el, by, val):
   else:
     raise Exception('Invalid SELECT BY type')
   
-  return
+  return True
 
 def inject_ppy_jquery():
   """Inject jQuery in the page using the Phantomime.ppy_jQuery
@@ -559,7 +567,7 @@ def wait(t=10, c=1):
     print 'Browser wait [%s/%s]...' % (str(c), str(t))
   
   if c >= t:
-    return
+    return True
   
   sleep(1)
   c += 1
@@ -577,8 +585,9 @@ def screenshot(t='base64', fname=None):
   
   screenshot_types = ['base64', 'raw', 'file']
   if t not in screenshot_types:
-    print 'Invalid screenshot type. Types: %s' % ', '.join(screenshot_types)
-    sys.exit()
+    raise Exception(
+      'Invalid screenshot type. Types: %s' % ', '.join(screenshot_types)
+    )
   
   sshot = Browser.get_screenshot_as_base64()
   
@@ -596,4 +605,4 @@ def screenshot(t='base64', fname=None):
     with open('%s.png' % fname, 'w') as f:
       f.write(raw)
       
-      return
+      return True
