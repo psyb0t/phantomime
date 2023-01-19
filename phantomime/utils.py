@@ -8,3 +8,7 @@ def get_random_ephemeral_port() -> int:
     s.close()
 
     return port
+
+
+def backoff_raise_timeout_exception(*args, **kwargs):
+    raise Exception("backoff timeout")

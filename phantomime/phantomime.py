@@ -2,8 +2,9 @@ import logging
 import backoff
 from . import docker
 from . import decorators
+from . import utils
 
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Union
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -30,8 +31,7 @@ SELECT_OPTION_SELECTOR_TYPE_VALUE: str = "VALUE"
 SCREENSHOT_OUTPUT_TYPE_BASE64: str = "BASE64"
 SCREENSHOT_OUTPUT_TYPE_FILE: str = "FILE"
 
-_driver_type: str = DRIVER_TYPE_FIREFOX
-_driver_type_to_options: Dict[str: ArgOptions] = {
+_driver_type_to_options: Dict = {
     DRIVER_TYPE_FIREFOX: webdriver.FirefoxOptions(),
     DRIVER_TYPE_CHROME: webdriver.ChromeOptions()
 }
@@ -40,24 +40,8 @@ _driver: Remote = None
 
 
 @decorators._must_have_supported_driver_type
-def set_driver_type():
-    """
-    Set the driver type for the session.
-    Supported driver types: 'FIREFOX', 'CHROME'
-    """
-    driver_type = driver_type.lower()
-    supported_driver_types = [DRIVER_TYPE_FIREFOX, DRIVER_TYPE_CHROME]
-    if driver_type not in supported_driver_types:
-        raise Exception(
-            'invalid driver. supported: %s' % ', '.join(supported_driver_types)
-        )
-
-    global _driver_type
-    _driver_type = driver_type
-
-
 @decorators._must_have_driver_uninitialized
-@backoff.on_exception(backoff.expo, Exception, max_time=30)
+@backoff.on_exception(backoff.expo, Exception, max_time=30, on_giveup=utils.backoff_raise_timeout_exception)
 def _init_driver(driver_type: str, selenium_hub_url: str):
     global _driver
     _driver = webdriver.Remote(
@@ -68,18 +52,22 @@ def _init_driver(driver_type: str, selenium_hub_url: str):
     set_window_size(DEFAULT_WINDOW_SIZE)
 
 
-def start(selenium_hub_url: str = None):
+@decorators._must_have_supported_driver_type
+@decorators._must_have_driver_uninitialized
+def start(driver_type: str = DRIVER_TYPE_FIREFOX, selenium_hub_url: str = None):
     """
     Start the session by initializing the driver and connecting to the given Selenium Hub URL.
-    If the Selenium Hub URL is not provided, a docker container running the Selenium Hub will be started and the URL http://localhost:<random_ephemeral_port>/wd/hub will be used.
+    If the Selenium Hub URL is not provided, a docker container running the
+    Selenium Hub will be started and the URL http://localhost:<random_ephemeral_port>/wd/hub will be used.
     """
     if selenium_hub_url is None:
-        selenium_hub_port = docker.start_container()
+        selenium_hub_port = docker.start_container(driver_type)
         selenium_hub_url = f"http://localhost:{selenium_hub_port}/wd/hub"
 
-    _init_driver(selenium_hub_url)
+    _init_driver(driver_type, selenium_hub_url)
 
 
+@decorators._must_have_driver_initialized
 def stop():
     """
     Stop the session by quitting the driver and stopping the Selenium hub container.
@@ -138,12 +126,16 @@ def wait_page_ready(timeout: int = 30):
     """
     Wait for the current page to be fully loaded.
     """
-    _log(f"waiting max {timeout}sec for page to be ready")
+    _log.debug(f"waiting max {timeout}sec for page to be ready")
 
-    f = backoff.on_predicate(backoff.expo, lambda x: x,
-                             max_time=timeout)(is_page_ready)
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda x: not x,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
 
-    f()
+    b(is_page_ready)()
 
 
 @decorators._must_have_driver_initialized
@@ -182,12 +174,16 @@ def wait_text_on_page(text: str, timeout: int = 30):
     """
     Wait for the given text to appear on the current page.
     """
-    _log(f"waiting {timeout}sec for page to contain text: {text}")
+    _log.debug(f"waiting {timeout}sec for page to contain text: {text}")
 
-    f = backoff.on_predicate(backoff.expo, lambda x: x,
-                             max_time=timeout)(is_text_on_page)
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda x: not x,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
 
-    f(text)
+    b(is_text_on_page)(text)
 
 
 def find_element(selector_type: str, selector: str) -> WebElement:
@@ -233,12 +229,16 @@ def wait_element_visible(element: WebElement, timeout: int = 10):
     """
     Wait for the given element to be visible.
     """
-    _log(f"waiting {timeout}sec for element to be visible: {element}")
+    _log.debug(f"waiting {timeout}sec for element to be visible: {element}")
 
-    f = backoff.on_predicate(backoff.expo, lambda x: x,
-                             max_time=timeout)(is_element_visible)
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda x: not x,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
 
-    f(element)
+    b(is_element_visible)(element)
 
 
 @decorators._must_have_supported_selector_type
@@ -247,12 +247,17 @@ def wait_element_not_visible(element: WebElement, timeout: int = 10):
     """
     Wait for the given element to not be visible.
     """
-    _log(f"waiting {timeout}sec for element to not be visible: {element}")
+    _log.debug(
+        f"waiting {timeout}sec for element to not be visible: {element}")
 
-    f = backoff.on_predicate(backoff.expo, lambda x: not x,
-                             max_time=timeout)(is_element_visible)
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda x: x,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
 
-    f(element)
+    b(is_element_visible)(element)
 
 
 @decorators._must_have_supported_selector_type
@@ -264,10 +269,14 @@ def wait_element_exists(selector_type: str, selector: str, timeout: int = 10) ->
     _log.debug(
         f"waiting for element matching {selector} by selector type {selector_type} to exist")
 
-    f = backoff.on_predicate(backoff.expo, lambda el: el is not None,
-                             max_time=timeout)(find_element)
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda el: el is None,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
 
-    return f(selector_type, selector)
+    return b(find_element)(selector_type, selector)
 
 
 @decorators._must_have_supported_selector_type
@@ -279,10 +288,14 @@ def wait_element_not_exists(selector_type: str, selector: str, timeout: int = 10
     _log.debug(
         f"waiting for element matching {selector} by selector type {selector_type} to not exist")
 
-    f = backoff.on_predicate(backoff.expo, lambda el: el is None,
-                             max_time=timeout)(find_element)
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda el: el is not None,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
 
-    f(selector_type, selector)
+    b(find_element)(selector_type, selector)
 
 
 @decorators._must_have_driver_initialized

@@ -69,7 +69,7 @@ def _must_have_supported_select_option_selector_type(fn: Callable) -> Any:
 def _must_have_supported_driver_type(fn: Callable) -> Any:
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        driver_type = args[1].upper()
+        driver_type = args[0].upper()
 
         supported_driver_types = [
             phantomime.DRIVER_TYPE_FIREFOX,

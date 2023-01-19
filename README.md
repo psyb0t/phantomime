@@ -36,11 +36,8 @@ Phantomime is an embeddable headless browser package for Python that provides a 
 ```python
 import phantomime
 
-# set driver type
-phantomime.set_driver_type(phantomime.DRIVER_TYPE_CHROME)
-
 # start the selenium hub container and connect the selenium WebDriver to it
-phantomime.start()
+phantomime.start(phantomime.DRIVER_TYPE_FIREFOX)
 
 # load a page
 phantomime.load_page("https://www.example.com")
