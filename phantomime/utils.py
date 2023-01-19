@@ -1,6 +1,4 @@
 import socket
-import time
-from typing import Callable
 
 
 def get_random_ephemeral_port() -> int:

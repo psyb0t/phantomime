@@ -1,37 +1,46 @@
-import base64
 import logging
 import backoff
-from . import utils
 from . import docker
 from . import decorators
 
-from typing import Tuple
+from typing import Tuple, List, Dict, Any
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver import Remote
+from selenium.webdriver.common.options import ArgOptions
+from selenium.webdriver.common.alert import Alert
 
 _log = logging.getLogger(__package__)
 
-DEFAULT_WINDOW_SIZE = (640, 480)
-DRIVER_TYPE_FIREFOX = "firefox"
-DRIVER_TYPE_CHROME = "chrome"
+DEFAULT_WINDOW_SIZE: Tuple[int, int] = (640, 480)
+DRIVER_TYPE_FIREFOX: str = "FIREFOX"
+DRIVER_TYPE_CHROME: str = "CHROME"
 
-SELECTOR_TYPE_XPATH = "XPATH"
-SELECTOR_TYPE_CSS = "CSS_SELECTOR"
+SELECTOR_TYPE_XPATH: str = "XPATH"
+SELECTOR_TYPE_CSS: str = "CSS_SELECTOR"
 
-_driver_type = DRIVER_TYPE_FIREFOX
-_driver_type_to_options = {
+SELECT_OPTION_SELECTOR_TYPE_INDEX: str = "INDEX"
+SELECT_OPTION_SELECTOR_TYPE_TEXT: str = "TEXT"
+SELECT_OPTION_SELECTOR_TYPE_VALUE: str = "VALUE"
+
+SCREENSHOT_OUTPUT_TYPE_BASE64: str = "BASE64"
+SCREENSHOT_OUTPUT_TYPE_FILE: str = "FILE"
+
+_driver_type: str = DRIVER_TYPE_FIREFOX
+_driver_type_to_options: Dict[str: ArgOptions] = {
     DRIVER_TYPE_FIREFOX: webdriver.FirefoxOptions(),
     DRIVER_TYPE_CHROME: webdriver.ChromeOptions()
 }
 
-_driver = None
+_driver: Remote = None
 
 
-def set_driver_type(driver_type: str):
+@decorators._must_have_supported_driver_type
+def set_driver_type():
     driver_type = driver_type.lower()
     supported_driver_types = [DRIVER_TYPE_FIREFOX, DRIVER_TYPE_CHROME]
     if driver_type not in supported_driver_types:
@@ -43,13 +52,13 @@ def set_driver_type(driver_type: str):
     _driver_type = driver_type
 
 
-@utils._must_have_driver_uninitialized
+@decorators._must_have_driver_uninitialized
 @backoff.on_exception(backoff.expo, Exception, max_time=30)
-def _init_driver(selenium_hub_url: str):
+def _init_driver(driver_type: str, selenium_hub_url: str):
     global _driver
     _driver = webdriver.Remote(
         command_executor=selenium_hub_url,
-        options=_driver_type_to_options[_driver_type]
+        options=_driver_type_to_options[driver_type]
     )
 
     set_window_size(DEFAULT_WINDOW_SIZE)
@@ -138,109 +147,19 @@ def wait_text_on_page(text: str, timeout: int = 30):
     f(text)
 
 
-@decorators._must_have_supported_selector_type
-@decorators._must_have_driver_initialized
-def is_element_visible(selector_type: str, selector: str) -> bool:
-    return False
-
-
-@decorators._must_have_driver_initialized
-def wait_element_visible(selector_type, selector, t=2):
-    """
+def find_element(selector_type: str, selector: str) -> WebElement:
     _log.debug(
-        f"finding elements matching {selector} by selector type {selector_type}")
-    if verbose:
-        print 'Waiting for %s:%s to be visible...' % (by, sel)
-
-    if by not in ['XPATH', 'CSS', 'CSS_SELECTOR']:
-        raise Exception('Invalid SELECT BY type')
-
-    if by == 'CSS':
-        by = 'CSS_SELECTOR'
+        f"finding element matching {selector} by selector type {selector_type}")
 
     try:
-        WebDriverWait(Browser, t).until(
-            EC.visibility_of_element_located((getattr(By, by), sel))
-        )
-
-        return find_elements(by, sel)[0]
-    except TimeoutException:
-        return False
-    """
-
-
-@decorators._must_have_driver_initialized
-def wait_element_not_visible(by, sel, t=2):
-    """
-    if verbose:
-        print 'Waiting for %s:%s to not be visible...' % (by, sel)
-
-    if by not in ['XPATH', 'CSS', 'CSS_SELECTOR']:
-        raise Exception('Invalid SELECT BY type')
-
-    if by == 'CSS':
-        by = 'CSS_SELECTOR'
-
-    try:
-        WebDriverWait(Browser, t).until_not(
-            EC.visibility_of_element_located((getattr(By, by), sel))
-        )
-
-        return True
-    except TimeoutException:
-        return False
-    """
-
-
-@decorators._must_have_driver_initialized
-def wait_element_exists(by, sel, t=2):
-    """
-    if verbose:
-        print 'Waiting for %s:%s to appear in DOM...' % (by, sel)
-
-    if by not in ['XPATH', 'CSS', 'CSS_SELECTOR']:
-        raise Exception('Invalid SELECT BY type')
-
-    if by == 'CSS':
-        by = 'CSS_SELECTOR'
-
-    try:
-        WebDriverWait(Browser, t).until(
-            EC.presence_of_element_located((getattr(By, by), sel))
-        )
-
-        return find_elements(by, sel)[0]
-    except TimeoutException:
-        return False
-    """
-
-
-@decorators._must_have_driver_initialized
-def wait_element_not_exists(by, sel, t=2):
-    """
-    if verbose:
-        print 'Waiting for %s:%s to disappear in DOM...' % (by, sel)
-
-    if by not in ['XPATH', 'CSS', 'CSS_SELECTOR']:
-        raise Exception('Invalid SELECT BY type')
-
-    if by == 'CSS':
-        by = 'CSS_SELECTOR'
-
-    try:
-        WebDriverWait(Browser, t).until_not(
-            EC.presence_of_element_located((getattr(By, by), sel))
-        )
-
-        return True
-    except TimeoutException:
-        return False
-    """
+        return _driver.find_element(getattr(By, selector_type), selector)
+    except:
+        return None
 
 
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
-def find_elements(selector_type: str, selector: str) -> any:
+def find_elements(selector_type: str, selector: str) -> List[WebElement]:
     _log.debug(
         f"finding elements matching {selector} by selector type {selector_type}")
 
@@ -250,94 +169,105 @@ def find_elements(selector_type: str, selector: str) -> any:
         return None
 
 
-def find_element():
-    pass
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
+def is_element_visible(element: WebElement) -> bool:
+    return element.is_displayed()
+
+
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
+def wait_element_visible(element: WebElement, timeout: int = 10):
+    _log(f"waiting {timeout}sec for element to be visible: {element}")
+
+    f = backoff.on_predicate(backoff.expo, lambda x: x,
+                             max_time=timeout)(is_element_visible)
+
+    f(element)
+
+
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
+def wait_element_not_visible(element: WebElement, timeout: int = 10):
+    _log(f"waiting {timeout}sec for element to not be visible: {element}")
+
+    f = backoff.on_predicate(backoff.expo, lambda x: not x,
+                             max_time=timeout)(is_element_visible)
+
+    f(element)
+
+
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
+def wait_element_exists(selector_type: str, selector: str, timeout: int = 10) -> WebElement:
+    _log.debug(
+        f"waiting for element matching {selector} by selector type {selector_type} to exist")
+
+    f = backoff.on_predicate(backoff.expo, lambda el: el is not None,
+                             max_time=timeout)(find_element)
+
+    return f(selector_type, selector)
+
+
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
+def wait_element_not_exists(selector_type: str, selector: str, timeout: int = 10):
+    _log.debug(
+        f"waiting for element matching {selector} by selector type {selector_type} to not exist")
+
+    f = backoff.on_predicate(backoff.expo, lambda el: el is None,
+                             max_time=timeout)(find_element)
+
+    f(selector_type, selector)
 
 
 @decorators._must_have_driver_initialized
-def scroll_to_element(element):
-    """
-    if verbose:
-        print 'Scrolling to element...'
-
-    return Browser.execute_script(
-        'return arguments[0].scrollIntoView(true);', element
-    )
-    """
+def scroll_to_element(element: WebElement):
+    _log.debug(f"scrolling to element {element}")
+    execute_script('return arguments[0].scrollIntoView(true);', element)
 
 
 @decorators._must_have_driver_initialized
-def hover_on_element(element):
-    """
-    if verbose:
-        print 'Hovering on element...'
+def hover_on_element(element: WebElement):
+    _log.debug(f"hovering to element {element}")
 
-    try:
-        actions = ActionChains(Browser)
-        actions.move_to_element(element)
-        actions.perform()
-
-        return True
-    except:
-        return False
-    """
+    actions = ActionChains(_driver)
+    actions.move_to_element(element)
+    actions.perform()
 
 
 @decorators._must_have_driver_initialized
-def click_by_js(element):
-    """
-    if verbose:
-        print 'Clicking on element by js...'
+def click_by_js(element: WebElement):
+    _log.debug(f"clicking on element {element} by JS")
+    execute_script('arguments[0].click();', element)
 
-    try:
-        Browser.execute_script('arguments[0].click();', element)
-        return True
-    except:
-        return False
-    """
+
+@decorators._must_have_supported_select_option_selector_type
+@decorators._must_have_driver_initialized
+def select_option(element: WebElement, selector_type: str, value: Any):
+    _log.debug(f"selecting option {value} by {selector_type} on {element}")
+
+    select = Select(element)
+    if selector_type is SELECT_OPTION_SELECTOR_TYPE_INDEX:
+        return select.select_by_index(value)
+    elif selector_type is SELECT_OPTION_SELECTOR_TYPE_TEXT:
+        select.select_by_visible_text(value)
+    elif selector_type is SELECT_OPTION_SELECTOR_TYPE_VALUE:
+        select.select_by_value(value)
 
 
 @decorators._must_have_driver_initialized
-def select_option(select_el, by, val):
-    """
-    select = Select(select_el)
+def execute_script(script: str) -> Any:
+    _log.debug(f"executing script {script}")
 
-    if by == 'index':
-        return select.select_by_index(val)
-    elif by == 'text':
-        select.select_by_visible_text(val)
-    elif by == 'value':
-        select.select_by_value(val)
-    else:
-        raise Exception('Invalid SELECT BY type')
-
-    return True
-    """
+    return _driver.execute_script(script)
 
 
 @decorators._must_have_driver_initialized
-def execute_script(script):
-    """
-    if verbose:
-        print 'Running JavaScript code...'
+def wait_for_alert(timeout: int = 3) -> Alert:
+    _log.debug(f"waiting {timeout}sec for an alert")
 
-    return Browser.execute_script(script)
-    """
-
-
-@decorators._must_have_driver_initialized
-def wait_for_alert(t=3):
-    """
-    if verbose:
-        print 'Waiting for alert to pop...'
-
-    try:
-        WebDriverWait(Browser, t).until(EC.alert_is_present())
-
-        return Browser.switch_to_alert()
-    except TimeoutException:
-        return False
-    """
+    return WebDriverWait(_driver, timeout).until(EC.alert_is_present())
 
 
 @decorators._must_have_driver_initialized
@@ -346,32 +276,16 @@ def clear_cookies():
 
 
 @decorators._must_have_driver_initialized
-def screenshot(t='base64', fname=None):
-    """
-    if verbose:
-        print 'Taking a screenshot...'
+def screenshot(output_type: str, filename=None) -> str:
+    filename_log_part = f" and filename {filename}"
+    _log.debug(
+        f"taking a screenshot having output type {output_type}{filename_log_part}")
 
-    screenshot_types = ['base64', 'raw', 'file']
-    if t not in screenshot_types:
-        raise Exception(
-            'Invalid screenshot type. Types: %s' % ', '.join(screenshot_types)
-        )
+    if output_type is SCREENSHOT_OUTPUT_TYPE_BASE64:
+        return _driver.get_screenshot_as_base64()
 
-    sshot = Browser.get_screenshot_as_base64()
+    png_filename = f"{filename}.png"
+    if not _driver.get_screenshot_as_file(png_filename):
+        raise Exception("could not get screenshot as file")
 
-    if t == 'base64':
-        return sshot
-
-    raw = base64.b64decode(sshot)
-    if t == 'raw':
-        return raw
-
-    if t == 'file':
-        if not fname:
-            raise Exception('Screenshot filename not defined')
-
-        with open('%s.png' % fname, 'w') as f:
-            f.write(raw)
-
-            return True
-    """
+    return png_filename
