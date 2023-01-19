@@ -34,7 +34,7 @@ Phantomime is an embeddable headless browser package for Python that provides a 
 ## Usage
 
 ```python
-import phantomime
+from phantomime import phantomime
 
 # start the selenium hub container and connect the selenium WebDriver to it
 phantomime.start(phantomime.DRIVER_TYPE_FIREFOX)
