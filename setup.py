@@ -12,7 +12,7 @@ setup(
     install_requires=[
         "backoff==2.2.1",
         "selenium==4.7.2",
-        "setuptools==59.6.0",
+        "setuptools==65.5.1",
         "docker==6.0.1",
     ],
 )
