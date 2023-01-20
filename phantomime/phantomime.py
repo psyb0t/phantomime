@@ -416,6 +416,7 @@ def clear_cookies():
     _driver.delete_all_cookies()
 
 
+@decorators._must_have_supported_screenshot_output_type
 @decorators._must_have_driver_initialized
 def screenshot(output_type: str, filename=None) -> str:
     """
