@@ -188,6 +188,8 @@ def wait_text_on_page(text: str, timeout: int = 30):
     b(is_text_on_page)(text)
 
 
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
 def find_element(selector_type: str, selector: str) -> WebElement:
     """
     Find the first element matching the given selector and selector type.
@@ -199,6 +201,18 @@ def find_element(selector_type: str, selector: str) -> WebElement:
         return _driver.find_element(getattr(By, selector_type), selector)
     except:
         return None
+
+
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
+def find_select_element(selector_type: str, selector: str) -> Select:
+    """
+    Find the first element matching the given selector and selector type and return it as a Select wrapped WebElement.
+    """
+    _log.debug(
+        f"finding element matching {selector} by selector type {selector_type} and returning it as a Select wrapped WebElement")
+
+    return Select(find_element(selector_type, selector))
 
 
 @decorators._must_have_supported_selector_type
@@ -280,9 +294,6 @@ def wait_element_is_visible(element: WebElement, timeout: int = 10):
     b(is_element_visible)(element)
 
 
-
-
-
 @decorators._must_have_driver_initialized
 def wait_element_not_visible(element: WebElement, timeout: int = 10):
     """
@@ -346,6 +357,7 @@ def wait_element_in_viewport(element: WebElement, timeout: int = 10):
 
     b(is_element_in_viewport)(element)
 
+
 @decorators._must_have_driver_initialized
 def scroll_to_element(element: WebElement):
     """
@@ -374,23 +386,6 @@ def click_by_js(element: WebElement):
     """
     _log.debug(f"clicking on element {element} by JS")
     execute_script('arguments[0].click();', element)
-
-
-@decorators._must_have_supported_select_option_selector_type
-@decorators._must_have_driver_initialized
-def select_option(element: WebElement, selector_type: str, value: Any):
-    """
-    Selects an option from the given element using the given selector_type and value.
-    """
-    _log.debug(f"selecting option {value} by {selector_type} on {element}")
-
-    select = Select(element)
-    if selector_type is SELECT_OPTION_SELECTOR_TYPE_INDEX:
-        return select.select_by_index(value)
-    elif selector_type is SELECT_OPTION_SELECTOR_TYPE_TEXT:
-        select.select_by_visible_text(value)
-    elif selector_type is SELECT_OPTION_SELECTOR_TYPE_VALUE:
-        select.select_by_value(value)
 
 
 @decorators._must_have_driver_initialized
