@@ -4,7 +4,7 @@ from . import docker
 from . import decorators
 from . import utils
 
-from typing import Tuple, List, Dict, Any, Union
+from typing import Tuple, List, Dict, Any
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -17,7 +17,9 @@ from selenium.webdriver.common.alert import Alert
 
 _log = logging.getLogger(__package__)
 
-DEFAULT_WINDOW_SIZE: Tuple[int, int] = (640, 480)
+DEFAULT_WINDOW_WITDH: int = 640
+DEFAULT_WINDOW_HEIGHT: int = 480
+
 DRIVER_TYPE_FIREFOX: str = "FIREFOX"
 DRIVER_TYPE_CHROME: str = "CHROME"
 
@@ -49,7 +51,7 @@ def _init_driver(driver_type: str, selenium_hub_url: str):
         options=_driver_type_to_options[driver_type]
     )
 
-    set_window_size(DEFAULT_WINDOW_SIZE)
+    set_window_size(DEFAULT_WINDOW_WITDH, DEFAULT_WINDOW_HEIGHT)
 
 
 @decorators._must_have_supported_driver_type
@@ -85,11 +87,11 @@ def set_page_load_timeout(page_load_timeout: int):
 
 
 @decorators._must_have_driver_initialized
-def set_window_size(window_size: Tuple[int, int]):
+def set_window_size(x: int, y: int):
     """
     Set the window size for the session.
     """
-    _driver.set_window_size(window_size[0], window_size[1])
+    _driver.set_window_size(x, y)
 
 
 @decorators._must_have_driver_initialized
@@ -216,52 +218,6 @@ def find_elements(selector_type: str, selector: str) -> List[WebElement]:
 
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
-def is_element_visible(element: WebElement) -> bool:
-    """
-    Check if the given element is visible.
-    """
-    return element.is_displayed()
-
-
-@decorators._must_have_supported_selector_type
-@decorators._must_have_driver_initialized
-def wait_element_visible(element: WebElement, timeout: int = 10):
-    """
-    Wait for the given element to be visible.
-    """
-    _log.debug(f"waiting {timeout}sec for element to be visible: {element}")
-
-    b = backoff.on_predicate(
-        backoff.expo,
-        lambda x: not x,
-        on_giveup=utils.backoff_raise_timeout_exception,
-        max_time=timeout
-    )
-
-    b(is_element_visible)(element)
-
-
-@decorators._must_have_supported_selector_type
-@decorators._must_have_driver_initialized
-def wait_element_not_visible(element: WebElement, timeout: int = 10):
-    """
-    Wait for the given element to not be visible.
-    """
-    _log.debug(
-        f"waiting {timeout}sec for element to not be visible: {element}")
-
-    b = backoff.on_predicate(
-        backoff.expo,
-        lambda x: x,
-        on_giveup=utils.backoff_raise_timeout_exception,
-        max_time=timeout
-    )
-
-    b(is_element_visible)(element)
-
-
-@decorators._must_have_supported_selector_type
-@decorators._must_have_driver_initialized
 def wait_element_exists(selector_type: str, selector: str, timeout: int = 10) -> WebElement:
     """
     Waits for an element matching the given selector by selector_type to exist on the current page.
@@ -297,6 +253,98 @@ def wait_element_not_exists(selector_type: str, selector: str, timeout: int = 10
 
     b(find_element)(selector_type, selector)
 
+
+@decorators._must_have_driver_initialized
+def is_element_visible(element: WebElement) -> bool:
+    """
+    Check if the given element is visible and in the current viewport.
+    """
+    return element.is_displayed()
+
+
+@decorators._must_have_driver_initialized
+def wait_element_is_visible(element: WebElement, timeout: int = 10):
+    """
+    Wait for the given element to be visible and in the current viewport.
+    """
+    _log.debug(
+        f"waiting {timeout}sec for element to be visible and in the current viewport: {element}")
+
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda x: not x,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
+
+    b(is_element_visible)(element)
+
+
+
+
+
+@decorators._must_have_driver_initialized
+def wait_element_not_visible(element: WebElement, timeout: int = 10):
+    """
+    Wait for the given element to not be visible.
+    """
+    _log.debug(
+        f"waiting {timeout}sec for element to not be visible: {element}")
+
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda x: x,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
+
+    b(is_element_visible)(element)
+
+
+@decorators._must_have_driver_initialized
+def is_element_in_viewport(element: WebElement) -> bool:
+    _log.debug(f"checking if element {element} is in viewport")
+
+    bounding_rect = execute_script("""
+        var rect = arguments[0].getBoundingClientRect();
+        return {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            left: rect.left
+        };
+    """, element)
+
+    viewport_size = execute_script("""
+        return {
+            width: document.documentElement.clientWidth,
+            height: document.documentElement.clientHeight
+        };
+    """)
+
+    if bounding_rect["right"] < 0 or bounding_rect["bottom"] < 0:
+        return False
+    if bounding_rect["left"] > viewport_size["width"] or bounding_rect["top"] > viewport_size["height"]:
+        return False
+    return True
+
+
+@decorators._must_have_driver_initialized
+def wait_element_in_viewport(element: WebElement, timeout: int = 10):
+    _log.debug(f"waiting {timeout}sec for element {element} to be viewport")
+
+    b = backoff.on_predicate(
+        backoff.expo,
+        lambda x: not x,
+        on_giveup=utils.backoff_raise_timeout_exception,
+        max_time=timeout
+    )
+
+    b(is_element_in_viewport)(element)
 
 @decorators._must_have_driver_initialized
 def scroll_to_element(element: WebElement):
@@ -346,13 +394,13 @@ def select_option(element: WebElement, selector_type: str, value: Any):
 
 
 @decorators._must_have_driver_initialized
-def execute_script(script: str) -> Any:
+def execute_script(script: str, *args) -> Any:
     """
     Execute a JavaScript script.
     """
     _log.debug(f"executing script {script}")
 
-    return _driver.execute_script(script)
+    return _driver.execute_script(script, *args)
 
 
 @decorators._must_have_driver_initialized
