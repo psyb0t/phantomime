@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>phantomime test</title>
+  </head>
+  <body>
+    <h1 id="page-title">phantomime test</h1>
+    <h2 class="page-subtitle">subtitle 1</h2>
+    <h2 class="page-subtitle">subtitle 2</h2>
+    <p id="visible-paragraph">this text is expected</p>
+    <p id="invisible-paragraph" style="display: none">
+      this text should not be visible
+    </p>
+    <button id="toggle-paragraph-visibility">
+      Toggle Paragraph Visibility
+    </button>
+    <button id="toggle-span-existence">Toggle Span Existence</button>
+    <select>
+      <option value="0">Option 0</option>
+      <option value="1">Option 1</option>
+      <option value="2">Option 2</option>
+    </select>
+    <div style="height: 10000px"></div>
+    <button id="alerter-out-of-view">Alerter Out of View</button>
+
+    <script>
+      document
+        .getElementById("toggle-paragraph-visibility")
+        .addEventListener("click", function () {
+          setTimeout(function () {
+            var pEl = document.getElementById("invisible-paragraph");
+            pEl.style.display = pEl.style.display === "none" ? "block" : "none";
+          }, 10000);
+        });
+      document
+        .getElementById("toggle-span-existence")
+        .addEventListener("click", function () {
+          setTimeout(function () {
+            var spanEl = document.getElementById("dynamically-created");
+            if (!spanEl) {
+              var newSpan = document.createElement("span");
+              newSpan.id = "dynamically-created";
+              document.body.appendChild(newSpan);
+            } else {
+              spanEl.remove();
+            }
+          }, 10000);
+        });
+      var alerterBtn = document.getElementById("alerter-out-of-view");
+      alerterBtn.onmouseover = function () {
+        alerterBtn.classList.add("isHovering");
+      };
+      alerterBtn.onmouseout = function () {
+        alerterBtn.classList.remove("isHovering");
+      };
+      alerterBtn.onclick = function () {
+        alert("Alert Triggered!");
+      };
+    </script>
+    <style>
+      .isHovering {
+        font-size: 50px;
+      }
+    </style>
+  </body>
+</html>
