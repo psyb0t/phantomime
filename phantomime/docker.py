@@ -14,14 +14,17 @@ def start_container(driver_type: str) -> int:
     client = docker.from_env()
     selenium_hub_port = utils.get_random_ephemeral_port()
 
-    image_name = f"selenium/standalone-{driver_type.lower()}:latest"
+    image_name = f"selenium/standalone-{driver_type.lower()}"
 
     _log.debug(
         f"starting docker container based on {image_name} exposing hub port on {selenium_hub_port}")
 
     _container = client.containers.run(image_name,
-                                       ports={4444: (
-                                           '127.0.0.1', selenium_hub_port)},
+                                       ports={
+                                           4444: ('127.0.0.1', selenium_hub_port),
+                                           # 7900: ('127.0.0.1', 7900)
+                                       },
+                                       shm_size="2g",
                                        detach=True)
 
     return selenium_hub_port
