@@ -141,7 +141,7 @@ def wait_page_ready(timeout: int = 30):
 
 
 @decorators._must_have_driver_initialized
-def page_title() -> str:
+def get_page_title() -> str:
     """
     Returns the title of the current page.
     """
@@ -365,6 +365,23 @@ def scroll_to_element(element: WebElement):
     """
     _log.debug(f"scrolling to element {element}")
     execute_script('return arguments[0].scrollIntoView(true);', element)
+
+
+@decorators._must_have_supported_selector_type
+@decorators._must_have_driver_initialized
+def switch_to_iframe(selector_type: str, selector: str):
+    _log.debug(f"switching to iframe {selector} by {selector_type}")
+    el = find_element(selector_type, selector)
+    if el is None:
+        raise Exception(f"could not find iframe {selector} by {selector_type}")
+
+    _driver.switch_to.frame(el)
+
+
+@decorators._must_have_driver_initialized
+def switch_to_main():
+    _log.debug(f"switching to main")
+    _driver.switch_to.default_content()
 
 
 @decorators._must_have_driver_initialized

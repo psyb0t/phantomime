@@ -37,7 +37,7 @@ def _must_have_supported_selector_type(fn: Callable) -> Any:
 
         if selector_type not in supported_selector_types:
             raise Exception(
-                f"invalid selector type. supported: {', '.join(supported_selector_types)}"
+                f"invalid selector type {selector_type}. supported: {', '.join(supported_selector_types)}"
             )
 
         return fn(*args, **kwargs)
