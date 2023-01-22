@@ -79,9 +79,11 @@ def stop():
     """
     Stop the session by quitting the driver and stopping the Selenium hub container.
     """
+    global _driver
     _driver.quit()
-    docker.stop_container()
     _driver = None
+
+    docker.stop_container()
 
 
 @decorators._must_have_driver_initialized
