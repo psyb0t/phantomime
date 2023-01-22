@@ -44,11 +44,16 @@ _driver: Remote = None
 @decorators._must_have_supported_driver_type
 @decorators._must_have_driver_uninitialized
 @backoff.on_exception(backoff.expo, Exception, max_time=30, on_giveup=utils.backoff_raise_timeout_exception)
-def _init_driver(driver_type: str, selenium_hub_url: str):
+def _init_driver(driver_type: str, selenium_hub_url: str, driver_arguments: List[str]):
     global _driver
+    options = _driver_type_to_options[driver_type]
+
+    for driver_option in driver_arguments:
+        options.add_argument(driver_option)
+
     _driver = webdriver.Remote(
         command_executor=selenium_hub_url,
-        options=_driver_type_to_options[driver_type]
+        options=options
     )
 
     set_window_size(DEFAULT_WINDOW_WITDH, DEFAULT_WINDOW_HEIGHT)
@@ -56,7 +61,7 @@ def _init_driver(driver_type: str, selenium_hub_url: str):
 
 @decorators._must_have_supported_driver_type
 @decorators._must_have_driver_uninitialized
-def start(driver_type: str = DRIVER_TYPE_FIREFOX, selenium_hub_url: str = None):
+def start(driver_type: str = DRIVER_TYPE_FIREFOX, selenium_hub_url: str = None, driver_arguments: List[str] = []):
     """
     Start the session by initializing the driver and connecting to the given Selenium Hub URL.
     If the Selenium Hub URL is not provided, a docker container running the
@@ -66,7 +71,7 @@ def start(driver_type: str = DRIVER_TYPE_FIREFOX, selenium_hub_url: str = None):
         selenium_hub_port = docker.start_container(driver_type)
         selenium_hub_url = f"http://localhost:{selenium_hub_port}/wd/hub"
 
-    _init_driver(driver_type, selenium_hub_url)
+    _init_driver(driver_type, selenium_hub_url, driver_arguments)
 
 
 @decorators._must_have_driver_initialized
