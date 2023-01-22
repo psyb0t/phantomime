@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='phantomime',
-    version='v2.3.0-alpha',
+    version='v2.3.1-alpha',
     packages=find_packages(),
     url='https://github.com/psyb0t/phantomime',
     license='WTFPL',

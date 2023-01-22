@@ -81,6 +81,7 @@ def stop():
     """
     _driver.quit()
     docker.stop_container()
+    _driver = None
 
 
 @decorators._must_have_driver_initialized
