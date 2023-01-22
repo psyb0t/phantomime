@@ -207,6 +207,20 @@ try:
     if el is None:
         raise Exception(f"{selector} not found")
 
+    # add cookie
+    cookie_name = "my-cookie"
+    cookie_value = "weird value"
+    phantomime.add_cookie(cookie_name, cookie_value)
+    cookies = phantomime.execute_script("return document.cookie")
+    if not all(want in cookies for want in [cookie_name, cookie_value]):
+        raise Exception(f"cookie {cookie_name} not correctly set")
+
+    # delete cookie
+    phantomime.delete_cookie(cookie_name)
+    cookies = phantomime.execute_script("return document.cookie")
+    if any(want in cookies for want in [cookie_name, cookie_value]):
+        raise Exception(f"cookie {cookie_name} not correctly deleted")
+
     # get screenshot as base64
     print(phantomime.screenshot(phantomime.SCREENSHOT_OUTPUT_TYPE_BASE64))
 

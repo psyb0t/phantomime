@@ -314,6 +314,9 @@ def wait_element_not_visible(element: WebElement, timeout: int = 10):
 
 @decorators._must_have_driver_initialized
 def is_element_in_viewport(element: WebElement) -> bool:
+    """
+    Check if an element is visible in the viewport
+    """
     _log.debug(f"checking if element {element} is in viewport")
 
     bounding_rect = execute_script("""
@@ -346,6 +349,9 @@ def is_element_in_viewport(element: WebElement) -> bool:
 
 @decorators._must_have_driver_initialized
 def wait_element_in_viewport(element: WebElement, timeout: int = 10):
+    """
+    Wait for an element to be visible in viewport
+    """
     _log.debug(f"waiting {timeout}sec for element {element} to be viewport")
 
     b = backoff.on_predicate(
@@ -370,6 +376,9 @@ def scroll_to_element(element: WebElement):
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
 def switch_to_iframe(selector_type: str, selector: str):
+    """
+    Move to an iframe
+    """
     _log.debug(f"switching to iframe {selector} by {selector_type}")
     el = find_element(selector_type, selector)
     if el is None:
@@ -423,6 +432,41 @@ def wait_for_alert(timeout: int = 3) -> Alert:
     _log.debug(f"waiting {timeout}sec for an alert")
 
     return WebDriverWait(_driver, timeout).until(EC.alert_is_present())
+
+
+@decorators._must_have_driver_initialized
+def add_cookie(name: str, value: str):
+    """
+    Add a cookie to the page
+    """
+    _log.debug(f"adding cookie {name} = {value}")
+
+    cookie = {
+        "name": name,
+        "value": value,
+    }
+
+    _driver.add_cookie(cookie)
+
+
+@decorators._must_have_driver_initialized
+def get_cookie(name: str) -> Any:
+    """
+    Get a cookie by name
+    """
+    _log.debug(f"getting cookie {name}")
+
+    return _driver.get_cookie(name)
+
+
+@decorators._must_have_driver_initialized
+def delete_cookie(name: str):
+    """
+    Delete a cookie by name
+    """
+    _log.debug(f"deleting cookie {name}")
+
+    return _driver.delete_cookie(name)
 
 
 @decorators._must_have_driver_initialized
