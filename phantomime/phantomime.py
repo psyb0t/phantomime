@@ -68,7 +68,7 @@ def start(driver_type: str = DRIVER_TYPE_FIREFOX, selenium_hub_url: str = None, 
     Selenium Hub will be started and the URL http://localhost:<random_ephemeral_port>/wd/hub will be used.
     """
     if selenium_hub_url is None:
-        selenium_hub_port = docker.start_container(driver_type)
+        selenium_hub_port = docker._start_container(driver_type)
         selenium_hub_url = f"http://localhost:{selenium_hub_port}/wd/hub"
 
     _init_driver(driver_type, selenium_hub_url, driver_arguments)
@@ -83,7 +83,7 @@ def stop():
     _driver.quit()
     _driver = None
 
-    docker.stop_container()
+    docker._stop_container()
 
 
 @decorators._must_have_driver_initialized

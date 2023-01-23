@@ -1,12 +1,14 @@
 import docker
 import logging
 from . import utils
+from . import decorators
 
 _log = logging.getLogger(__package__)
 _container = None
 
 
-def start_container(driver_type: str) -> int:
+@decorators._must_have_supported_driver_type
+def _start_container(driver_type: str) -> int:
     global _container
     if _container is not None:
         raise Exception("docker container already running")
@@ -30,7 +32,7 @@ def start_container(driver_type: str) -> int:
     return selenium_hub_port
 
 
-def stop_container():
+def _stop_container():
     global _container
     if _container is None:
         return
