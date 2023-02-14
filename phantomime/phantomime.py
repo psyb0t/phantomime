@@ -180,6 +180,9 @@ def _bypass_cloudflare_site_connection_secure_check2() -> bool:
 
 @decorators._must_have_driver_initialized
 def bypass_cloudflare_site_connection_secure() -> bool:
+    """
+    Try to bypass the cloudflare site connection secure checker page
+    """
     if not _bypass_cloudflare_site_connection_secure_check1():
         return False
 
@@ -499,6 +502,9 @@ def switch_to_iframe(selector_type: str, selector: str):
 
 @decorators._must_have_driver_initialized
 def switch_to_main():
+    """
+    Switch to base frame
+    """
     _log.debug(f"switching to main")
     _driver.switch_to.default_content()
 
