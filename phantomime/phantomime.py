@@ -60,7 +60,7 @@ def _init_driver(
 
     if user_agent != "":
         if driver_type == DRIVER_TYPE_CHROME:
-            options.add_argument("user-agent=%s" % user_agent)
+            options.add_argument(f"--user-agent={user_agent}")
         elif driver_type == DRIVER_TYPE_FIREFOX:
             options.set_preference("general.useragent.override", user_agent)
 
