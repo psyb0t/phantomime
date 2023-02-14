@@ -4,6 +4,7 @@ from . import docker
 from . import decorators
 from . import utils
 
+from time import sleep
 from typing import Tuple, List, Dict, Any
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
@@ -49,6 +50,7 @@ def _init_driver(
     selenium_hub_url: str,
     driver_arguments: List[str],
     user_agent: str,
+    disable_notifications: bool,
 ):
     global _driver
     options = _driver_type_to_options[driver_type]
@@ -61,6 +63,12 @@ def _init_driver(
             options.add_argument("user-agent=%s" % user_agent)
         elif driver_type == DRIVER_TYPE_FIREFOX:
             options.set_preference("general.useragent.override", user_agent)
+
+    if disable_notifications:
+        if driver_type == DRIVER_TYPE_CHROME:
+            options.add_argument("--disable-notifications")
+        elif driver_type == DRIVER_TYPE_FIREFOX:
+            options.set_preference("dom.webnotifications.enabled", False)
 
     _driver = webdriver.Remote(
         command_executor=selenium_hub_url,
@@ -77,6 +85,7 @@ def start(
     selenium_hub_url: str = None,
     driver_arguments: List[str] = [],
     user_agent: str = "",
+    disable_notifications: bool = False,
 ):
     """
     Start the session by initializing the driver and connecting to the given Selenium Hub URL.
@@ -87,7 +96,8 @@ def start(
         selenium_hub_port = docker._start_container(driver_type)
         selenium_hub_url = f"http://localhost:{selenium_hub_port}/wd/hub"
 
-    _init_driver(driver_type, selenium_hub_url, driver_arguments, user_agent)
+    _init_driver(driver_type, selenium_hub_url, driver_arguments,
+                 user_agent, disable_notifications)
 
 
 @decorators._must_have_driver_initialized
@@ -119,12 +129,88 @@ def set_window_size(x: int, y: int):
 
 
 @decorators._must_have_driver_initialized
-def load_page(url: str) -> str:
+def _bypass_cloudflare_site_connection_secure_check1() -> bool:
+    selector = 'div.hcaptcha-box iframe'
+    el = None
+    try:
+        el = wait_element_exists(SELECTOR_TYPE_CSS, selector, 10)
+    except:
+        return True
+
+    switch_to_iframe(SELECTOR_TYPE_CSS, selector)
+
+    selector = "label.ctp-checkbox-label"
+    try:
+        el = wait_element_exists(SELECTOR_TYPE_CSS, selector, 20)
+    except:
+        return False
+
+    el.click()
+
+    switch_to_main()
+
+    selector = 'div.hcaptcha-box iframe'
+    try:
+        wait_element_not_exists(SELECTOR_TYPE_CSS, selector, 20)
+    except:
+        return False
+
+    return True
+
+
+@decorators._must_have_driver_initialized
+def _bypass_cloudflare_site_connection_secure_check2() -> bool:
+    selector = 'input[type="button"][value="Verify you are human"]'
+    el = None
+
+    try:
+        el = wait_element_exists(SELECTOR_TYPE_CSS, selector, 10)
+    except:
+        return True
+
+    el.click()
+
+    try:
+        wait_element_not_exists(SELECTOR_TYPE_CSS, selector, 20)
+    except:
+        return False
+
+    return True
+
+
+@decorators._must_have_driver_initialized
+def bypass_cloudflare_site_connection_secure() -> bool:
+    if not _bypass_cloudflare_site_connection_secure_check1():
+        return False
+
+    if not _bypass_cloudflare_site_connection_secure_check2():
+        return False
+
+    if is_text_on_page("Checking if the site connection is secure"):
+        return False
+
+    return True
+
+
+@decorators._must_have_driver_initialized
+def load_page(url: str, try_human_verif_bypass: bool = False) -> str:
     """
     Navigate to the specified URL.
     """
     _log.debug(f"loading page {url}")
     _driver.get(url)
+
+    if try_human_verif_bypass:
+        c = 1
+        while True:
+            sleep(10)
+            if bypass_cloudflare_site_connection_secure():
+                return
+
+            if c >= 20:
+                raise Exception("could not bypass captcha")
+
+            c += 1
 
 
 @decorators._must_have_driver_initialized
