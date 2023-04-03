@@ -262,6 +262,14 @@ def get_page_title() -> str:
 
 
 @decorators._must_have_driver_initialized
+def get_page_url() -> str:
+    """
+    Returns the URL of the current page.
+    """
+    return _driver.current_url
+
+
+@decorators._must_have_driver_initialized
 def scroll_page():
     """
     Scrolls the page by its current height.
