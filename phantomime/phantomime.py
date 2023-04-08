@@ -311,51 +311,63 @@ def wait_text_on_page(text: str, timeout: int = 30):
 
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
-def find_element(selector_type: str, selector: str) -> WebElement:
+def find_element(selector_type: str, selector: str, parent_el: WebElement = None) -> WebElement:
     """
     Find the first element matching the given selector and selector type.
+    If parent_el is set, it will search for a child element.
     """
     _log.debug(
         f"finding element matching {selector} by selector type {selector_type}")
 
     try:
-        return _driver.find_element(getattr(By, selector_type), selector)
+        root_el = _driver
+        if parent_el is not None:
+            root_el = parent_el
+
+        return root_el.find_element(getattr(By, selector_type), selector)
     except:
         return None
 
 
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
-def find_select_element(selector_type: str, selector: str) -> Select:
+def find_select_element(selector_type: str, selector: str, parent_el: WebElement = None) -> Select:
     """
     Find the first element matching the given selector and selector type and return it as a Select wrapped WebElement.
+    If parent_el is set, it will search for a child element.
     """
     _log.debug(
         f"finding element matching {selector} by selector type {selector_type} and returning it as a Select wrapped WebElement")
 
-    return Select(find_element(selector_type, selector))
+    return Select(find_element(selector_type, selector, parent_el))
 
 
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
-def find_elements(selector_type: str, selector: str) -> List[WebElement]:
+def find_elements(selector_type: str, selector: str, parent_el: WebElement = None) -> List[WebElement]:
     """
     Find all elements matching the given selector and selector type.
+    If parent_el is set, it will search for child elements.
     """
     _log.debug(
         f"finding elements matching {selector} by selector type {selector_type}")
 
     try:
-        return _driver.find_elements(getattr(By, selector_type), selector)
+        root_el = _driver
+        if parent_el is not None:
+            root_el = parent_el
+
+        return root_el.find_elements(getattr(By, selector_type), selector)
     except:
         return None
 
 
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
-def wait_element_exists(selector_type: str, selector: str, timeout: int = 10) -> WebElement:
+def wait_element_exists(selector_type: str, selector: str, timeout: int = 10, parent_el: WebElement = None) -> WebElement:
     """
     Waits for an element matching the given selector by selector_type to exist on the current page.
+    If parent_el is set, it will wait for a child element.
     """
     _log.debug(
         f"waiting for element matching {selector} by selector type {selector_type} to exist")
@@ -367,14 +379,15 @@ def wait_element_exists(selector_type: str, selector: str, timeout: int = 10) ->
         max_time=timeout
     )
 
-    return b(find_element)(selector_type, selector)
+    return b(find_element)(selector_type, selector, parent_el)
 
 
 @decorators._must_have_supported_selector_type
 @decorators._must_have_driver_initialized
-def wait_element_not_exists(selector_type: str, selector: str, timeout: int = 10):
+def wait_element_not_exists(selector_type: str, selector: str, timeout: int = 10, parent_el: WebElement = None):
     """
     Waits for an element matching the given selector by selector_type to not exist on the current page.
+    If parent_el is set, it will wait for a child element.
     """
     _log.debug(
         f"waiting for element matching {selector} by selector type {selector_type} to not exist")
@@ -386,7 +399,7 @@ def wait_element_not_exists(selector_type: str, selector: str, timeout: int = 10
         max_time=timeout
     )
 
-    b(find_element)(selector_type, selector)
+    b(find_element)(selector_type, selector, parent_el)
 
 
 @decorators._must_have_driver_initialized
